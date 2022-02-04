@@ -864,7 +864,7 @@ blockquote {
   transition: height 0.3s ease-in-out;
 }
 .nav-solid .navbar-nav > li > a {
-  color: #434343;
+  color: white;
 }
 .nav-solid .navigation {
   position: fixed;
