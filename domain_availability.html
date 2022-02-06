@@ -168,7 +168,7 @@ def _check(domain):
   except AttributeError:
     with open(CSV_PATH, 'a') as domainCSV:
       writer = csv.writer(domainCSV)
-      writer.writerow([dom])
+      writer.writerow([domain.name])
 
 def _lookup(dom):
   if previous_dom and min(dom,previous_dom) == dom:
