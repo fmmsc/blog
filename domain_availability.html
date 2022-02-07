@@ -120,20 +120,6 @@
                     
                     <!--Post Single-->
                     <div class="postSingle">               
-                        
-                        <div class="postMedia">                    
-                            <img alt="" src="">
-                        </div><!--Post image-->
-
-                        <div class="postMeta clearfix">
-                            <div class="postMeta-info">
-                                <span class="metaAuthor"><i class="fa fa-user"></i> <a href="#">Frederico Martins</a></span>
-                                <span class="metaCategory"><i class="fa fa-folder"></i> <a href="#">Branding</a></span>
-                            </div>
-                            <div class="postMeta-date">
-                                <span class="metaDate"><i class="fa fa-calendar"></i> <a href="#">02 February 2022</a></span>
-                            </div>
-                        </div><!--Post meta-->
 
                         <div class="postTitle" style="text-align: center;">
                             <h1>Domain Availability</h1>
@@ -162,13 +148,13 @@ LOCK_PATH='{}/.domains'.format(os.path.dirname(__file__))
 logging.basicConfig(filename=LOG_PATH, encoding='utf-8', level=logging.INFO,
   format='%(asctime)s %(levelname)s %(message)s')
 
-def _check(domain):
+def _check(dom, domain):
   try:
     domain.registrar
   except AttributeError:
     with open(CSV_PATH, 'a') as domainCSV:
       writer = csv.writer(domainCSV)
-      writer.writerow([domain.name])
+      writer.writerow([dom])
 
 def _lookup(dom):
   if previous_dom and min(dom,previous_dom) == dom:
@@ -183,7 +169,7 @@ def _lookup(dom):
     return
   except (Exception,KeyboardInterrupt):
     _exit(dom)
-  _check(domain)
+  _check(dom, domain)
 
 def _lock():
   try:
@@ -233,50 +219,6 @@ logging.info('Finished')</code></pre>
                     <!--End post single-->            
                 </div>
             </div> <!-- /.row -->
-
-            <div class="row multi-columns-row">
-              
-                <div class="col-md-3 col-sm-6">              
-                    <!-- Widget 2 -->
-                    <div class="widget" style="height: 164px;">
-                        <h4>Categories</h4>
-                        <ul class="cat-list">
-                            <li><a href="#">Branding <span class="countCat">(1)</span></a></li>
-                        </ul> 
-                    </div> <!--End widget-->
-                </div>
-
-                <div class="col-md-3 col-sm-6">                   
-                    <!-- Widget 3 -->
-                    <div class="widget" style="height: 164px;">
-                        <h4>Tags</h4>
-                        <ul class="tag-list">
-                            <li><a href="#">Python</a></li>
-                        </ul>
-                    </div> <!--End widget-->
-                </div>
-
-                <div class="col-md-3 col-sm-6">                           
-                    <!--Widget 4-->
-                    <div class="widget" style="height: 164px;">
-                        <h4>Archives</h4>
-                        <ul class="cat-archives">
-                            <li><a href="#">February 2022</a></li>
-                        </ul>
-                    </div> <!--End widget-->
-                </div>
-
-                <div class="col-md-3 col-sm-6">                                                 
-                    <!--Widget 5-->
-                    <div class="widget" style="height: 164px;">
-                        <h4>Users</h4>
-                        <ul class="meta">
-                            <li><a href="#">Frederico Martins</a></li>
-                        </ul>
-                    </div> <!--End widget-->                             
-                </div> <!-- /.col -->
-
-            </div>  <!-- /.row -->
         
         </div> <!-- /.container -->
 
