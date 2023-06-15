@@ -122,97 +122,101 @@
                     <div class="postSingle">               
 
                         <div class="postTitle" style="text-align: center;">
-                            <h1>Domain Availability</h1>
+                            <h1>Huawei OceanStor API Automation</h1>
                             <div class="divider-center-small"></div>
                         </div> <!--Post title-->  
 
-                        <p>If you are trying to find your next best domain, may it be for your company branding or for your domain porfolio investing, the following script may help. The script was tested with python3 and the only needed dependency, besides python3 itself, is the <b>python-whois</b> library.<br>The script iterates through all the domains with 3 letters, from <b>aaa.com</b> to <b>zzz.com</b> and logs the domain without any registrar, which in turn may be available for acquisition. It may also be changed to search for dictionary words, another domain instead of <b>.com</b>, search 4 letters instead of 3, etc.</p>
+                        <p>If you are looking to automate some tasks in your Huawei OceanStor instead of doing manual work, the API provided by Huawei for the software can be a simple solution for your needs that requires no setup or configuration. In this case, we will be using <b>ansible</b> to automate the process and the calls, so we will need that package installed. The used ansible core version in this example is the 2.14.<br>
+                        The OceanStor API documentation can be quite extensive, so we will let here just a couple of examples of usage, that hopefully will help you understand and maybe save some time. For any other needs check out the official documentation and feel free to build on top of this template.</p>
                             
-                         <blockquote>"The domain market is a very competitive space, working on a first come-first served, where the number of available domains with premium characteristics is limited and is disputed with the entire world. It shares a lot of similarities with the land market, but instead of a nearby city or a great view, you have premium branding or more visibility."</blockquote>
+                         <blockquote>"Work smarter, not harder."</blockquote>
                                     
-                        <p>This python scripts creates 3 files in the same directory it is being executed in. Creates a log file, which the logging level can be changed from INFO to DEBUG, if any errors are being found. Creates a second lock file, if the script is interrupted in any way or stopped, so it doesn't start all the way from the beggining of the domain check, example <b>aaa.com</b> would be the most checked domain and so on. Finally it creates the last file for easier bulk domain name check, which is a CSV with all domains missing registrar, which may therefore be available to be bought.<br>The script is best executed as a background process and you can easily monitor it by tailing the <b>domains.log</b> file.<br><br><b>NOTE</b>: The lock file might need to be deleted if changing between the functions 'threeLetterSearch', 'fourLetterSearch' or 'wordSearch'.</p>
+                        <p>This ansible playbook can be ran from your local machine or from a remote server, depending on your environment, as long as the ansible packages are installed and present. The playbook as is, will run locally, connect to the Huawei OceanStor API on the default port <b>8088</b> and authenticate the user. In this example, we will backup a volume using the snapshot and clone method, first getting all the available volumes, after creating the clone and the snapshot for the selected one.<br><br><b>NOTE</b>: It's possible to skip the authentication by removing the first task and getting the values from the <b>login</b> variable to the headers in the later tasks.</p>
 
-                            <pre><code class="python">import csv
-import logging
-import os
-import whois
+                            <pre><code class="ansible">---
+- hosts: localhost # Host with network flow to the Huawei OceanStor API
+  gather_facts: no 
+  vars:
+    time: "{{ ansible_date_time.epoch_int }}"
+    source_lun: lun_name # LUN to operate on
+    ip: 10.0.0.10 # Huawei OceanStor API address
+    port: 8088 # Huawei OceanStor API port
+    username: admin
+    password: ''
+    scope: 0 # Scope 0 is for local users, 1 is for LDAP
+  tasks:
+    - name: API Login
+      uri:
+        url: "https://{{ ip }}:{{ port }}/deviceManager/rest/xxxxx/sessions"
+        method: POST
+        body_format: json
+        body: 
+          username: "{{ username }}"
+          password: "{{ password }}"
+          scope: "{{ scope }}"
+        timeout: 10
+        validate_certs: no
+      register: login # Will return the variables for headers later use for the authenticated user
 
-from english_words import english_words_lower_alpha_set
-from string import ascii_lowercase
+    - debug:
+        var: login
 
-TLD='.com'
-CSV_PATH='{}/domains.csv'.format(os.path.dirname(__file__))
-LOG_PATH='{}/domains.log'.format(os.path.dirname(__file__))
-LOCK_PATH='{}/.domains'.format(os.path.dirname(__file__))
+    - name: Get LUNs
+      uri:
+        url: "https://{{ ip }}:{{ port }}/deviceManager/rest/{{ login.json.data.deviceid }}/lun"
+        method: GET
+        timeout: 5
+        validate_certs: no
+        headers:
+         Content-Type: "{{ login.content_type }}"
+         iBaseToken: "{{ login.json.data.iBaseToken }}"
+         Cookie: "{{ login.set_cookie }}"
+      register: unmap # returns a list of LUNs
 
-logging.basicConfig(filename=LOG_PATH, encoding='utf-8', level=logging.INFO,
-  format='%(asctime)s %(levelname)s %(message)s')
+    - debug:
+        var: unmap.json.data
 
-def _check(dom, domain):
-  try:
-    domain.registrar
-  except AttributeError:
-    with open(CSV_PATH, 'a') as domainCSV:
-      writer = csv.writer(domainCSV)
-      writer.writerow([dom])
+    - name: Clone LUN {{ source_lun }}
+      uri:
+        url: "https://{{ ip }}:{{ port }}/deviceManager/rest/{{ login.json.data.deviceid }}/lun"
+        method: POST
+        body_format: json
+        body: 
+          isclone: true
+          name: "dstore_{{ time }}_{{ mysql_instance }}"
+          clonesourceid: '{{ unmap.somevalue }}'
+        timeout: 5
+        validate_certs: no
+        headers:
+         Content-Type: "{{ login.content_type }}"
+         iBaseToken: "{{ login.json.data.iBaseToken }}"
+         Cookie: "{{ login.set_cookie }}"
+      register: cloned
 
-def _lookup(dom):
-  if previous_dom and min(dom,previous_dom) == dom:
-    logging.debug('Skipping {}'.format(dom))
-    return
-  logging.debug('Looking up {}'.format(dom))
-  try:
-   domain = whois.query(dom)
-  except (TypeError,whois.exceptions.FailedParsingWhoisOutput,
-    whois.exceptions.UnknownDateFormat) as error:
-    logging.debug("Failed with error: {}".format(error))
-    return
-  except (Exception,KeyboardInterrupt):
-    _exit(dom)
-  _check(dom, domain)
-
-def _lock():
-  try:
-    with open(LOCK_PATH, 'r') as domainLock:
-      return domainLock.read()
-  except FileNotFoundError:
-    return None
-
-def _exit(dom):
-  with open(LOCK_PATH, 'w') as domainLock:
-    domainLock.write(dom)
-  logging.info('Finished')
-  exit()
-
-def threeLetterSearch():
-  for a in ascii_lowercase:
-    for b in ascii_lowercase: 
-      for c in ascii_lowercase:
-        _lookup('{}{}{}{}'.format(a,b,c,TLD))
-
-def fourLetterSearch():
-  for a in ascii_lowercase:
-    for b in ascii_lowercase: 
-      for c in ascii_lowercase:
-        for d in ascii_lowercase:
-          _lookup('{}{}{}{}{}'.format(a,b,c,d,TLD))
-
-def wordSearch():
-  for a in english_words_lower_alpha_set:
-    _lookup('{}{}'.format(a,TLD))
-
-previous_dom = _lock()
-logging.info('Started')
-threeLetterSearch()
-#fourLetterSearch()
-#WordSearch()
-logging.info('Finished')</code></pre>
-                        <p>To run the script simply execute the following line in the terminal:
-                        <pre><code class="bash">python3 /path/to/created_script.py</code></pre>
+    - name: Mapping LUN {{ cloned.json.instanceId }}
+      uri:
+        url: "https://{{ ip }}:{{ port }}/api/v2/mapping"
+        method: POST
+        body_format: json
+        body: '{ "lunId": "", "hostName": "{{ Server }}" }' # Can be used lunName instead
+        timeout: 5
+        validate_certs: no
+        headers:
+         Content-Type: "{{ login.content_type }}"
+         iBaseToken: "{{ login.json.data.iBaseToken }}"
+         Cookie: "{{ login.set_cookie }}"
+      register: mapped
+      when:  cloned.json | length >= 1
+</code></pre>
+                        <p>To run the playbook simply execute the following line in the terminal:
+                        <pre><code class="bash">ansible-playbook /path/to/created_playbook.yml</code></pre>
+                        
+                        <p><b>Disclaimer:</b> This playbook should be used as an example only and should not be used directly in production environments, since there can be quite the differences between software configurations that can result in misconfigurations or worse incidents like data loss. Consult with a specialist and test the play before in some sort of development environment. Reach out if any support or development is needed.</p>
+                     
                         <div class="postTags clearfix">
                             <h4><i class="fa fa-tags"></i>Tags :</h4>
                             <ul class="list-inline">
-                                <li><a href="#">Python</a></li>
+                                <li><a href="#">Ansible</a></li>
                             </ul>
                         </div>
 
