@@ -129,7 +129,7 @@
                         <p>If you are looking to automate some tasks in your Huawei OceanStor instead of doing manual work, the API provided by Huawei for the software can be a simple solution for your needs that requires no setup or configuration. In this case, we will be using <b>ansible</b> to automate the process and the calls, so we will need that package installed. The used ansible core version in this example is the 2.14.<br>
                         The OceanStor API documentation can be quite extensive, so we will let here just a couple of examples of usage, that hopefully will help you understand and maybe save some time. For any other needs check out the official documentation and feel free to build on top of this template.</p>
                             
-                         <blockquote>"Work smarter, not harder."</blockquote>
+                         <blockquote>"Work smarter, not harder." Allen F. Morgenstern</blockquote>
                                     
                         <p>This ansible playbook can be ran from your local machine or from a remote server, depending on your environment, as long as the ansible packages are installed and present. The playbook as is, will run locally, connect to the Huawei OceanStor API on the default port <b>8088</b> and authenticate the user. In this example, we will backup a volume using the snapshot and clone method, first getting all the available volumes, after creating the clone and the snapshot for the selected one.<br><br><b>NOTE</b>: It's possible to skip the authentication by removing the first task and getting the values from the <b>login</b> variable to the headers in the later tasks.</p>
 

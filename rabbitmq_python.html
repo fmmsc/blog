@@ -122,95 +122,93 @@
                     <div class="postSingle">               
 
                         <div class="postTitle" style="text-align: center;">
-                            <h1>Domain Availability</h1>
+                            <h1>Software Communication With RabbitMQ</h1>
                             <div class="divider-center-small"></div>
                         </div> <!--Post title-->  
 
-                        <p>If you are trying to find your next best domain, may it be for your company branding or for your domain porfolio investing, the following script may help. The script was tested with python3 and the only needed dependency, besides python3 itself, is the <b>python-whois</b> library.
-                        <p>The library can be installed through pip with the following command:</p>
-                        <pre><code class="bash">pip3 install python-whois</code></pre><br>The script iterates through all the domains with 3 letters, from <b>aaa.com</b> to <b>zzz.com</b> and logs the domain without any registrar, which in turn may be available for acquisition. It may also be changed to search for dictionary words, another domain instead of <b>.com</b>, search 4 letters instead of 3, etc.</p>
+                        <p>If you are in need of having applications, scripts or software of any kind comunicate between themselves, RabbitMQ is a great messaging queue software for that purpose. Being able to create multiple queues, virtual hosts, users, etc on the same environment, makes it a tool equipped to deal with most enterprise needs on software communication. In the script below, it is assumed that you already have a running RabbitMQ service deployed and we will not be going through it in this article, so if you haven't yet setup your node or cluster, make sure to find a good tutorial or read the documentation on how to deploy a RabbitMQ instance.</p>
                             
-                         <blockquote>"The domain market is a very competitive space, working on a first come-first served, where the number of available domains with premium characteristics is limited and is disputed with the entire world. It shares a lot of similarities with the land market, but instead of a nearby city or a great view, you have premium branding or more visibility."</blockquote>
+                         <blockquote>"The great enemy of communication, we find, is the illusion of it." William H. Whyte</blockquote>
                                     
-                        <p>This python scripts creates 3 files in the same directory it is being executed in. Creates a log file, which the logging level can be changed from INFO to DEBUG, if any errors are being found. Creates a second lock file, if the script is interrupted in any way or stopped, so it doesn't start all the way from the beggining of the domain check, example <b>aaa.com</b> would be the most checked domain and so on. Finally it creates the last file for easier bulk domain name check, which is a CSV with all domains missing registrar, which may therefore be available to be bought.<br>The script is best executed as a background process and you can easily monitor it by tailing the <b>domains.log</b> file.<br><br><b>NOTE</b>: The lock file might need to be deleted if changing between the functions 'threeLetterSearch', 'fourLetterSearch' or 'wordSearch'.</p>
+                        <p>This python script creates a class with logging for DEBUG purposes only and with most RabbitMQ basic needs. The connection is initiated when the object is created and reconnection attempts are done whenever a network error is presented. The <b>pika</b> library is the wrapper for the RabbitMQ API in python and is used to connect/disconnect and operate. In this example, I am using JSON for communication and transform it to a JSON string before sending the message to the queue, which is then converted again to JSON after being received the string from the queue.<br><br><b>NOTE</b>: This script is best used as module to be imported onto a python script or software, with the last 3 lines serving as an example of usage.</p>
 
-                            <pre><code class="python">import csv
-import logging
-import os
-import whois
+                            <pre><code class="python">#!/usr/bin/env python3
 
-from english_words import english_words_lower_alpha_set
-from string import ascii_lowercase
+import json, logging, pika
 
-TLD='.com'
-CSV_PATH='{}/domains.csv'.format(os.path.dirname(__file__))
-LOG_PATH='{}/domains.log'.format(os.path.dirname(__file__))
-LOCK_PATH='{}/.domains'.format(os.path.dirname(__file__))
+class RabbitMQ:
+    def __init__(self, host, username, password, virtual_host='/', durable=True):
+        self.host = host
+        self.username = username
+        self.password = password
+        self.virtual_host = virtual_host
+        self.durable = durable
+        self.connect()
 
-logging.basicConfig(filename=LOG_PATH, encoding='utf-8', level=logging.INFO,
-  format='%(asctime)s %(levelname)s %(message)s')
+    def connect(self):
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=self.host,
+            credentials=pika.credentials.PlainCredentials(self.username, self.password),
+            virtual_host=self.virtual_host))
 
-def _check(dom, domain):
-  try:
-    domain.registrar
-  except AttributeError:
-    with open(CSV_PATH, 'a') as domainCSV:
-      writer = csv.writer(domainCSV)
-      writer.writerow([dom])
+    def disconnect(self):
+        self.connection.close()
 
-def _lookup(dom):
-  if previous_dom and min(dom,previous_dom) == dom:
-    logging.debug('Skipping {}'.format(dom))
-    return
-  logging.debug('Looking up {}'.format(dom))
-  try:
-   domain = whois.query(dom)
-  except (TypeError,whois.exceptions.FailedParsingWhoisOutput,
-    whois.exceptions.UnknownDateFormat) as error:
-    logging.debug("Failed with error: {}".format(error))
-    return
-  except (Exception,KeyboardInterrupt):
-    _exit(dom)
-  _check(dom, domain)
+    def receive(self, queue):
+        message = None
+        logging.debug(f"Checking messages on RabbitMQ for queue '{queue}'")
+        while True:
+            try:
+                channel = self.connection.channel()
+            except pika.exceptions.StreamLostError:
+                logging.debug(f"RabbitMQ lost stream, reconnecting")
+                self.connect()
+            else:
+                break
+        status = channel.queue_declare(queue=queue, durable=self.durable)
+        if status.method.message_count == 0:
+            logging.debug(f"Empty queue '{queue}', skipping")
+            channel.close()
+            return
+        try:
+            for method_frame, properties, body in channel.consume(queue):
+                message = json.loads(body)
+                logging.debug(f"Message '{message}' received from queue '{queue}'")
+                channel.basic_ack(method_frame.delivery_tag)
+                break # Needed so the consumer doesn't stay waiting for another message
+        except pika.exceptions.ChannelClosedByBroker as e:
+            logging.debug(f"RabbitMQ channel closed due to '{e}'")
+        requeued_messages = channel.cancel()
+        channel.close()
+        return message
 
-def _lock():
-  try:
-    with open(LOCK_PATH, 'r') as domainLock:
-      return domainLock.read()
-  except FileNotFoundError:
-    return None
+    def send(self, queue, message):
+        while True:
+            try:
+                channel = self.connection.channel()
+            except pika.exceptions.StreamLostError:
+                logging.debug(f"RabbitMQ lost stream, reconnecting")
+                self.connect()
+            else:
+                break
+        channel.queue_declare(queue=queue, durable=self.durable)
+        channel.basic_publish(exchange='', routing_key=queue, body=json.dumps(message),
+            properties=pika.BasicProperties(
+                delivery_mode = 2, # make message persistent
+            )
+        )
+        logging.debug(f"Message '{message}' sent to RabbitMQ queue '{queue}'")
+        channel.close()
 
-def _exit(dom):
-  with open(LOCK_PATH, 'w') as domainLock:
-    domainLock.write(dom)
-  logging.info('Finished')
-  exit()
-
-def threeLetterSearch():
-  for a in ascii_lowercase:
-    for b in ascii_lowercase: 
-      for c in ascii_lowercase:
-        _lookup('{}{}{}{}'.format(a,b,c,TLD))
-
-def fourLetterSearch():
-  for a in ascii_lowercase:
-    for b in ascii_lowercase: 
-      for c in ascii_lowercase:
-        for d in ascii_lowercase:
-          _lookup('{}{}{}{}{}'.format(a,b,c,d,TLD))
-
-def wordSearch():
-  for a in english_words_lower_alpha_set:
-    _lookup('{}{}'.format(a,TLD))
-
-previous_dom = _lock()
-logging.info('Started')
-threeLetterSearch()
-#fourLetterSearch()
-#WordSearch()
-logging.info('Finished')</code></pre>
-                        <p>To run the script simply execute the following line in the terminal:</p>
+if __name__ == '__main__':
+    logging.basicConfig()
+    rabbitmq = RabbitMQ('localhost', 'username', 'somepassword')
+    rabbitmq.send('test', [{"foo":"bar"},{"foo":"bar"}])
+    rabbitmq.receive('test')
+</code></pre>
+                        <p>To run the script simply execute the following line in the terminal:
                         <pre><code class="bash">python3 /path/to/created_script.py</code></pre>
+                     
                         <div class="postTags clearfix">
                             <h4><i class="fa fa-tags"></i>Tags :</h4>
                             <ul class="list-inline">
