@@ -2,12 +2,22 @@
   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
       <loc>https://blog.fmmsc.com/index.html</loc>
-        <lastmod>2023-06-19</lastmod>
+      <lastmod>2023-06-19</lastmod>
+      <priority>1.00</priority>
+    </url>
+    <url>
       <loc>https://blog.fmmsc.com/domain_availability.html</loc>
-        <lastmod>2023-06-15</lastmod>
+      <lastmod>2023-06-15</lastmod>
+      <priority>0.80</priority>
+    </url>
+    <url>
       <loc>https://blog.fmmsc.com/ansible_oceanstor.html</loc>
-        <lastmod>2023-06-16</lastmod>
+      <lastmod>2023-06-16</lastmod>
+      <priority>0.80</priority>
+    </url>
+    <url>
       <loc>https://blog.fmmsc.com/rabbitmq_python.html</loc>
-        <lastmod>2023-06-19</lastmod>
+      <lastmod>2023-06-19</lastmod>
+      <priority>0.80</priority>
     </url>
   </urlset>
